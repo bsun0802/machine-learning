@@ -1,10 +1,7 @@
 from __future__ import division, print_function
-
-from typing import List, Tuple, Callable
+from typing import List
 
 import numpy as np
-import scipy
-import matplotlib.pyplot as plt
 from utils import euclidean_distance
 
 
@@ -60,3 +57,7 @@ class Perceptron:
 
     def get_weights(self) -> List[float]:
         return self.w
+
+
+if __name__ == '__main__':
+    print(np.__version__)

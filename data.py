@@ -1,4 +1,4 @@
-import np
+import numpy as np
 from typing import List, Tuple
 from sklearn.datasets import load_iris
 from sklearn.datasets import load_breast_cancer

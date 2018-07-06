@@ -1,14 +1,7 @@
 from __future__ import division, print_function
+from typing import List
 
-from typing import List, Callable
-
-import numpy
-import scipy
-
-
-############################################################################
-# DO NOT MODIFY ABOVE CODES
-############################################################################
+import numpy as np
 from collections import Counter
 
 
@@ -38,11 +31,10 @@ class KNN:
         pred = []
         for point1 in features:
             pd = [self.distance_function(point1, point2) for point2 in self.training_features]
-            knearest = [self.labels[i] for i in numpy.argpartition(pd, self.k)[:self.k]]
+            knearest = [self.labels[i] for i in np.argpartition(pd, self.k)[:self.k]]
             pred.append(majority(knearest))
         return pred
 
 
 if __name__ == '__main__':
-    print(numpy.__version__)
-    print(scipy.__version__)
+    print(np.__version__)

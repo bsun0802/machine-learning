@@ -1,14 +1,8 @@
 from __future__ import division, print_function
-
 from typing import List
 
-import numpy
-import scipy
+import numpy as np
 
-
-############################################################################
-# DO NOT MODIFY ABOVE CODES
-############################################################################
 
 class LinearRegression:
     def __init__(self, nb_features: int):
@@ -16,13 +10,13 @@ class LinearRegression:
 
     def train(self, features: List[List[float]], values: List[float]):
         """Normal equation: inv(X_transpose * X) * X_transpose * y """
-        X = numpy.insert(numpy.array(features), 0, 1, axis=1)
-        y = numpy.array(values).reshape((-1, 1))
-        self.weight = numpy.linalg.inv(X.T @ X) @ X.T @ y
+        X = np.insert(np.array(features), 0, 1, axis=1)
+        y = np.array(values).reshape((-1, 1))
+        self.weight = np.linalg.inv(X.T @ X) @ X.T @ y
 
     def predict(self, features: List[List[float]]) -> List[float]:
         """X @ weight, since weight is column vector"""
-        pred = numpy.insert(numpy.array(features), 0, 1, axis=1) @ self.weight
+        pred = np.insert(np.array(features), 0, 1, axis=1) @ self.weight
         return pred.ravel().tolist()
 
     def get_weights(self) -> List[float]:
@@ -37,11 +31,10 @@ class LinearRegressionWithL2Loss(LinearRegression):
         self.nb_features = nb_features
 
     def train(self, features: List[List[float]], values: List[float]):
-        X = numpy.insert(numpy.array(features), 0, 1, axis=1)
-        y = numpy.array(values).reshape((-1, 1))
-        self.weight = numpy.linalg.inv(X.T @ X + self.alpha * numpy.eye(X.shape[1])) @ X.T @ y
+        X = np.insert(np.array(features), 0, 1, axis=1)
+        y = np.array(values).reshape((-1, 1))
+        self.weight = np.linalg.inv(X.T @ X + self.alpha * np.eye(X.shape[1])) @ X.T @ y
 
 
 if __name__ == '__main__':
-    print(numpy.__version__)
-    print(scipy.__version__)
+    print(np.__version__)
