@@ -11,5 +11,6 @@ To walk through machine-learning work flow, e.g., split train&test data, bulid a
 cross-validation, tuning parameters, etc. Run `main.ipynb`
 
 ### The sub-directories are well-konwn dataset and problems in machine learning field.
-Of my practice on solving those problems with *scikit-learn*. 
+Of my practice on solving those problems with *scikit-learn* :shipit:. 
 
+/play ohyeah
