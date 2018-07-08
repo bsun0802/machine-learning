@@ -13,4 +13,3 @@ cross-validation, tuning parameters, etc. Run `main.ipynb`
 ### The sub-directories are well-konwn dataset and problems in machine learning field.
 Of my practice on solving those problems with *scikit-learn* :shipit:. 
 
-/play ohyeah
