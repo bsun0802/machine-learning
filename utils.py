@@ -32,7 +32,7 @@ def inner_product_distance(point1: List[float], point2: List[float]) -> float:
 def gaussian_kernel_distance(
         point1: List[float], point2: List[float]
 ) -> float:
-    return np.exp(-.5 * np.dot(point1, point2))
+    return np.exp(-.5 * euclidean_distance(point1, point2) ** 2)
 
 
 def f1_score(real_labels: List[int], predicted_labels: List[int]) -> float:
@@ -67,7 +67,7 @@ class NormalizationScaler:
         if the input features = [[3, 4], [1, -1], [0, 0]],
         the output should be [[0.6, 0.8], [0.707107, -0.707107], [0, 0]]
         """
-        return [np.array(f) / np.sqrt(np.dot(f, f)) for f in features]
+        return [np.array(f) / np.sqrt(np.dot(f, f)) if np.any(f) else f for f in features]
 
 
 class MinMaxScaler:
@@ -104,15 +104,15 @@ class MinMaxScaler:
         """
         def scale():
             X = np.array(features)
-            return (X - np.min(X, axis=0)) / (np.max(X, axis=0) - np.min(X, axis=0))
+            return (X - self.fmin) / (self.fmax - self.fmin)
 
         def transform():
             X = np.array(features)
-            return (X - self.min) / (self.max - self.min)
+            return (X - self.fmin) / (self.fmax - self.fmin)
 
         if self._newly_created:
-            self.min = np.amin(features, axis=None)
-            self.max = np.amax(features, axis=None)
+            self.fmin = np.amin(features, axis=0)
+            self.fmax = np.amax(features, axis=0)
             self._newly_created = False
             return scale().tolist()
         else:
