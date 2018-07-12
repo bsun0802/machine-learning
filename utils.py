@@ -29,10 +29,9 @@ def inner_product_distance(point1: List[float], point2: List[float]) -> float:
     return np.dot(point1, point2)
 
 
-def gaussian_kernel_distance(
-        point1: List[float], point2: List[float]
-) -> float:
-    return np.exp(-.5 * euclidean_distance(point1, point2) ** 2)
+def gaussian_kernel_distance(point1: List[float], point2: List[float]) -> float:
+    """Note that this so called "distance" is negative"""
+    return -np.exp(-.5 * euclidean_distance(point1, point2) ** 2)
 
 
 def f1_score(real_labels: List[int], predicted_labels: List[int]) -> float:
