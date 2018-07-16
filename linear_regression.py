@@ -1,6 +1,4 @@
-from __future__ import division, print_function
 from typing import List
-
 import numpy as np
 
 
@@ -10,7 +8,7 @@ class LinearRegression:
 
     def train(self, features: List[List[float]], values: List[float]):
         """Normal equation: inv(X_transpose * X) * X_transpose * y """
-        X = np.insert(np.array(features), 0, 1, axis=1)
+        X = np.insert(np.array(features), 0, 1, axis=1)  # fit intercept
         y = np.array(values).reshape((-1, 1))
         self.weight = np.linalg.inv(X.T @ X) @ X.T @ y
 
@@ -31,7 +29,7 @@ class LinearRegressionWithL2Loss(LinearRegression):
         self.nb_features = nb_features
 
     def train(self, features: List[List[float]], values: List[float]):
-        X = np.insert(np.array(features), 0, 1, axis=1)
+        X = np.insert(np.array(features), 0, 1, axis=1)  # fit intercept
         y = np.array(values).reshape((-1, 1))
         self.weight = np.linalg.inv(X.T @ X + self.alpha * np.eye(X.shape[1])) @ X.T @ y
 

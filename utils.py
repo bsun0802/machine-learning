@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List
+from math import floor
 
 
 def mean_squared_error(y_true: List[float], y_pred: List[float]) -> float:
@@ -56,40 +57,69 @@ def precision_recall(known, pred):
     return precision, recall
 
 
+def one_hot(y, nb_class, row=True):
+    if row:
+        Y = np.zeros((len(y), nb_class))
+        Y[np.arange(len(y)), y] = 1
+    else:
+        Y = np.zeros(nb_class, len(y))
+        Y[y, np.arange(len(y))] = 1
+    return Y
+
+
+def softmax(P):
+    """stable softmax of P of demision N by k, where
+            N is the number of samples
+            k is the number of class
+    """
+    Q = np.exp(P - np.max(P, axis=1, keepdims=True))
+    return Q / np.sum(Q, axis=1, keepdims=True)
+
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
+def accuracy_score(true, preds):
+    return np.sum(true == preds).astype(float) / len(true)
+
+
+def minibatch(X: np.ndarray, batch_fraction=.1):
+    """return the index of the minibatch"""
+    n = floor(X.shape[0] * batch_fraction)
+    return np.unique(np.random.randint(0, X.shape[0], size=n))
+
+
 class NormalizationScaler:
     def __init__(self):
         pass
 
     def __call__(self, features: List[List[float]]) -> List[List[float]]:
-        """
-        normalize the feature vector to unit magnitude. For example,
-        if the input features = [[3, 4], [1, -1], [0, 0]],
-        the output should be [[0.6, 0.8], [0.707107, -0.707107], [0, 0]]
+        """ normalize the feature vector to unit magnitude.
+            For example, if the input features = [[3, 4], [1, -1], [0, 0]],
+                the output should be [[0.6, 0.8], [0.707107, -0.707107], [0, 0]]
         """
         return [np.array(f) / np.sqrt(np.dot(f, f)) if np.any(f) else f for f in features]
 
 
 class MinMaxScaler:
-    """
-    Assume the parameters are valid when __call__
+    """ Assume the parameters are valid when __call__
                 is being called the first time (you can find min and max).
+        Example:
+            train_features = [[0, 10], [2, 0]]
+            test_features = [[20, 1]]
 
-    Example:
-        train_features = [[0, 10], [2, 0]]
-        test_features = [[20, 1]]
+            scaler = MinMaxScale()
+            train_features_scaled = scaler(train_features)
+            # now train_features_scaled should be [[0, 1], [1, 0]]
 
-        scaler = MinMaxScale()
-        train_features_scaled = scaler(train_features)
-        # now train_features_scaled should be [[0, 1], [1, 0]]
+            test_features_sacled = scaler(test_features)
+            # now test_features_scaled should be [[10, 0.1]]
 
-        test_features_sacled = scaler(test_features)
-        # now test_features_scaled should be [[10, 0.1]]
-
-        new_scaler = MinMaxScale() # creating a new scaler
-        _ = new_scaler([[1, 1], [0, 0]]) # new trainfeatures
-        test_features_scaled = new_scaler(test_features)
-        # now test_features_scaled should be [[20, 1]]
-
+            new_scaler = MinMaxScale() # creating a new scaler
+            _ = new_scaler([[1, 1], [0, 0]]) # new trainfeatures
+            test_features_scaled = new_scaler(test_features)
+            # now test_features_scaled should be [[20, 1]]
     """
 
     def __init__(self):
