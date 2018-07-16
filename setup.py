@@ -7,11 +7,13 @@ import pandas
 import statsmodels
 import sklearn
 import idx2numpy
+import seaborn
 
 if __name__ == '__main__':
     print('scipy: %s' % scipy.__version__)
     print('numpy: %s' % numpy.__version__)
     print('matplotlib: %s' % matplotlib.__version__)
+    print('seaborn(Plotting): %s' % seaborn.__version__)
     print('pandas: %s' % pandas.__version__)
     print('statsmodels: %s' % statsmodels.__version__)
     print('sklearn: %s' % sklearn.__version__)
