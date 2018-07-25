@@ -3,6 +3,7 @@ import argparse
 import numpy as np
 from utils import make_parameter_estimate_data, make_learning_data, to_list
 from typing import List, Tuple
+Matrix = List[List[float]]
 
 
 class Hmm:
@@ -107,7 +108,7 @@ class Hmm:
 
         return "".join([self.states[i] for i in reversed(path)])
 
-    def params_estimate(self, Z, seq) -> Tuple[List[float], List[float]]:
+    def params_estimate(self, Z, seq) -> Tuple[Matrix, Matrix]:
         """Estimate A and B given hidden path Z and observed sequence.
         Instead of pseudo-count, the non-observed ones will be imputed as uniform"""
         def overlap_substr_count(s, t):
