@@ -1,6 +1,7 @@
 import json
 import argparse
 import numpy as np
+from utils import make_model_json, make_parameter_estimate_data, params_estimate
 
 
 class Hmm:
@@ -104,7 +105,8 @@ class Hmm:
         path.reverse()
         return path
 
-    def train(self, seq, A="uniform", B="uniform"):
+    def train(self, seq, A0="uniform", B0="uniform", max_iter=25):
+        """Baum Welch learning, learn the most likely transition A and emission B"""
         def argwhere(li, target):
             return [idx for idx, i in enumerate(li) if i == target]
 
@@ -112,14 +114,18 @@ class Hmm:
         N = len(obs)
         S = len(self.pi)
         K = len(self.obs_encode)
-        if A == "uniform":
+
+        self.A = np.array(A0, dtype=float)
+        self.B = np.array(B0, dtype=float)
+        if A0 == "uniform":
             self.A = np.ones((S, S)) / (S ** 2)
-        if B == "uniform":
+        if B0 == "uniform":
             self.B = np.ones((S, K)) / (S * K)
         assert self.A.shape == (S, S)
         assert self.B.shape == (S, K)
+
         xsi = np.zeros((N - 1, S, S))
-        while True:
+        for i in range(max_iter):
             # E-step
             alpha = self.forward(seq)
             beta = self.backward(seq)
@@ -136,33 +142,60 @@ class Hmm:
             B = np.ones_like(self.B)
             for j in range(K):
                 B[:, j] = gamma[:, argwhere(obs, j)].sum(axis=1) / gamma.sum(axis=1)
-            tol = 1e-4
-            if max(np.abs(self.A - A).max(), np.abs(self.B - B).max()) < tol:
-                break
             self.A = A
             self.B = B
 
+    def estimate_AB(self, path, obs):
+        pass
 
-def main(model_file, obs):
+
+def main(model_file, obs_seq):
     hmm = Hmm(model_file)
-    # Make sure you use train_model.json when you train HMM
-    # hmm.train(obs)
-    # np.testing.assert_array_almost_equal(hmm.A, [[0, 1], [1, 0]])
-    # np.testing.assert_array_almost_equal(hmm.B, [[1, 0], [0, 1]])
-    alpha = hmm.forward(obs)
-    beta = hmm.backward(obs)
-    seq_prob = hmm.seq_prob(obs)
-    prob2 = np.dot(hmm.pi, beta[:, 0] * hmm.B[:, hmm.obs_encode[obs[0]]])
-    np.testing.assert_almost_equal(seq_prob, prob2)  # prob2 is path probabiliti calculated by backward algorithm
+    alpha = hmm.forward(obs_seq)
+    beta = hmm.backward(obs_seq)
+    seq_prob = hmm.seq_prob(obs_seq)
+    prob2 = np.dot(hmm.pi, beta[:, 0] * hmm.B[:, hmm.obs_encode[obs_seq[0]]])
+    # prob2 is path probabiliti calculated by backward algorithm
+    np.testing.assert_almost_equal(seq_prob, prob2)
 
     print('Total log probability of observing the sequence %s is (%g, %g). from (forward, backward) algorithm.' % (
-        obs, np.log(seq_prob), np.log(prob2)))
+        obs_seq, np.log(seq_prob), np.log(prob2)))
 
-    viterbi_path = hmm.viterbi(obs)
+    viterbi_path = hmm.viterbi(obs_seq)
 
     print('Viterbi best path is ')
     for j in viterbi_path:
         print(hmm.states[j], end=' ')
+
+
+def test_baum_welch(model_file, obs_seq, A0, B0, max_iter):
+    """Correctness verified by submitting to Rosalind, problem BA10K"""
+    hmm = Hmm(model_file)
+    hmm.train(obs_seq, A0=A0, B0=B0, max_iter=max_iter)
+    _A = hmm.A.astype(str).tolist()
+    _B = hmm.B.astype(str).tolist()
+    with open("baum_welch_out.txt", "w") as fo:
+        fo.write("\t".join(hmm.states) + "\n")
+        for idx, s in enumerate(hmm.states):
+            fo.write(s + "\t" + "\t".join(_A[idx]) + "\n")
+        fo.write("-" * 8 + "\n")
+        fo.write("\t".join(sorted(hmm.obs_encode, key=hmm.obs_encode.get)) + "\n")
+        for idx, s in enumerate(hmm.states):
+            fo.write(s + "\t" + "\t".join(_B[idx]) + "\n")
+
+
+def test_estimate_AB():
+    """Correctness verified by submitting to Rosalind, problem BA10K"""
+    pseudo_Z, states, obs_seq, obs_set = make_parameter_estimate_data("params_estimate.txt")
+    A_est, B_est = params_estimate(pseudo_Z, states, obs_seq, obs_set)
+    with open("param_est.txt", "w") as fo:
+        fo.write("\t".join(states) + "\n")
+        for idx, s in enumerate(states):
+            fo.write(s + "\t" + "\t".join([str(i) for i in A_est[idx]]) + "\n")
+        fo.write("-" * 8 + "\n")
+        fo.write("\t" + "\t".join(obs_set) + "\n")
+        for idx, s in enumerate(states):
+            fo.write(s + "\t" + "\t".join([str(i) for i in B_est[idx]]) + "\n")
 
 
 if __name__ == "__main__":
@@ -171,3 +204,7 @@ if __name__ == "__main__":
     parser.add_argument("obs_seq", help="the full observation sequence")
     args = parser.parse_args()
     main(args.model_file, args.obs_seq)
+
+    A0, B0, obs_seq, max_iter = make_model_json("Baum_Welch.txt", known_params=False)
+    test_baum_welch("train_hmm.json", obs_seq, A0, B0, max_iter)
+    test_estimate_AB()
