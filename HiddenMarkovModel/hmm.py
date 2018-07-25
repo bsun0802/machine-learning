@@ -1,7 +1,8 @@
 import json
 import argparse
 import numpy as np
-from utils import make_parameter_estimate_data, make_learning_data, to_list
+from utils import (make_parameter_estimate_data, make_learning_data,
+                   mat_to_list, read_known_model)
 from typing import List, Tuple
 Matrix = List[List[float]]
 
@@ -15,13 +16,16 @@ class Hmm:
         If the model parameters are specified, we could calculate
         - Probability of observing a sequence: P(O | theta). (Forward, Backward algorithm)
         - The most likely hidden path under an observation sequence O: argmax P(Z | theta, O),
-                                    (Viterbi algorithm)
+                                    (Viterbi algorithm).
+        - Soft decoing: Pr(Z_t = i | O, theta), denoted as eta[i, t] here.
 
-        Or given state set S, pi, and observed sequence O, train the parameter A and B.
-                (Forward-Backward algorithm with E-M). *Not implemented here.*
+        If transitions and emissions probabilities are unknown, given states and observations alphabet, the observerd sequence, and reasonable initial guess of A0 and B0, we could train hmm parameters with:
+        - Baum-Welch algorithm, E-M flavour algorithm a.k.a Forward-Backward algorithm.
+        - Viterbi learning: iteratively update parameter estimations and the Viterbi path obtained in the current parameters setting. Works not as accuracy as Baum-Welch, but the computational efficiency gains are typically worth it.
 
-        Encoding: to utilize numpy.ndarray, states and emissions are encoded as 0, 1, 2, ...
-        All recusion is vectorized as ndarray multiplication, so, fast.
+        Implementation details:
+            Encoding: to utilize numpy.ndarray, states and emissions are encoded as 0, 1, 2, ...
+            All recusion is vectorized as ndarray multiplication.
     """
 
     def __init__(self, model_file):
@@ -107,6 +111,12 @@ class Hmm:
             state = psi[state, bt]
 
         return "".join([self.states[i] for i in reversed(path)])
+
+    def soft_decoding(self, seq) -> np.ndarray:
+        alpha = self.forward(seq)
+        beta = self.backward(seq)
+        eta = alpha * beta / self.seq_prob(seq)
+        return eta
 
     def params_estimate(self, Z, seq) -> Tuple[Matrix, Matrix]:
         """Estimate A and B given hidden path Z and observed sequence.
@@ -220,7 +230,7 @@ def test_output(outout_file, A, B, states, obs_set):
 def test_learning(model_file, obs_seq, A0, B0, max_iter, method):
     hmm = Hmm(model_file)
     hmm.train(obs_seq, A0=A0, B0=B0, max_iter=max_iter, method=method)
-    test_output(f"{method}_out.txt", to_list(hmm.A, str), to_list(hmm.B, str),
+    test_output(f"{method}_out.txt", mat_to_list(hmm.A, str), mat_to_list(hmm.B, str),
                 hmm.states, hmm.obs_set)
 
 
@@ -228,8 +238,17 @@ def test_estimate_AB(model_file, Z, obs_seq):
     """Correctness verified by submitting to Rosalind, problem BA10H"""
     hmm = Hmm(model_file)
     A_est, B_est = hmm.params_estimate(Z, obs_seq)
-    test_output("param_est_out.txt", to_list(A_est, str), to_list(B_est, str),
+    test_output("param_est_out.txt", mat_to_list(A_est, str), mat_to_list(B_est, str),
                 hmm.states, hmm.obs_set)
+
+
+def test_soft_decoding(model_file, obs_seq):
+    hmm = Hmm(model_file)
+    eta = hmm.soft_decoding(obs_seq)
+    with open("soft_decoding_out.txt", "w") as fo:
+        fo.write("\t".join(hmm.states) + "\n")
+        for j in range(eta.shape[1]):
+            fo.write("\t".join(eta[:, j].astype(str).tolist()) + "\n")
 
 
 if __name__ == "__main__":
@@ -252,3 +271,6 @@ if __name__ == "__main__":
     parser.add_argument("obs_seq", help="the full observation sequence")
     args = parser.parse_args()
     main(args.model_file, args.obs_seq)
+    
+    obs_seq = read_known_model("soft_decoding_input.txt")
+    test_soft_decoding("hmm_model_sd.json", obs_seq)

@@ -1,10 +1,19 @@
 import json
+import os
 
 
-def to_list(prob_mat, dtype):
+def mat_to_list(prob_mat, dtype):
     if isinstance(prob_mat, list):
         return [list(map(dtype, row)) for row in prob_mat]
     return prob_mat.astype(dtype).tolist()
+
+
+def line(f):
+    return f.readline().rstrip()
+
+
+def br(f):
+    f.readline()
 
 
 def make_model_json(fn, **kwargs):
@@ -12,35 +21,54 @@ def make_model_json(fn, **kwargs):
         json.dump(kwargs, f)
 
 
-def make_learning_data(input, method="bw"):
-    """The input is from Rosalind problem BA10K,
-        See more information here: http://rosalind.info/problems/ba10k/"""
-    def br():
-        f.readline()
+def read_known_model(input) -> str:
+    with open(input, "r") as f:
+        obs_seq = line(f)
+        br(f)
+        obs_set = line(f).split()
+        observations = {i: idx for idx, i in enumerate(obs_set)}
+        br(f)
+        states = line(f).split()
+        br(f)
+        br(f)
+        A = []
+        B = []
+        for i in range(len(states)):
+            A.append([float(i) for i in line(f).split()[1:]])
+        br(f)
+        br(f)
+        for i in range(len(states)):
+            B.append([float(i) for i in line(f).split()[1:]])
+        pi = [round(1 / len(states), 4)] * len(states)
 
-    def line(f):
-        return f.readline().rstrip()
+    make_model_json("hmm_model_sd.json", states=states, pi=pi, observations=observations,
+                    A=A, B=B)
+
+    return obs_seq
+
+
+def make_learning_data(input, method="bw"):
     A0 = []
     B0 = []
     with open(input, "r") as f:
         max_iter = int(line(f))
-        br()
+        br(f)
         obs_seq = line(f)
-        br()
+        br(f)
         obs_set = line(f).split()
         observations = {i: idx for idx, i in enumerate(obs_set)}
-        br()
+        br(f)
         states = line(f).split()
-        br()
-        br()
+        br(f)
+        br(f)
         for i in range(len(states)):
             A0.append(line(f).split()[1:])
-        br()
-        br()
+        br(f)
+        br(f)
         for i in range(len(states)):
             B0.append(line(f).split()[1:])
-    A0 = to_list(A0, float)
-    B0 = to_list(B0, float)
+    A0 = mat_to_list(A0, float)
+    B0 = mat_to_list(B0, float)
     pi = [round(1 / len(states), 4)] * len(states)
     if method == "bw":
         make_model_json("train_hmm.json", states=states, pi=pi, observations=observations)
