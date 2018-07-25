@@ -1,7 +1,8 @@
 import json
 import argparse
 import numpy as np
-from utils import make_model_json, make_parameter_estimate_data, params_estimate
+from utils import make_parameter_estimate_data, make_learning_data, to_list
+from typing import List, Tuple
 
 
 class Hmm:
@@ -30,9 +31,11 @@ class Hmm:
                 self.A = np.array(data["A"])
             if data.get("B"):
                 self.B = np.array(data["B"])
+            if data.get("pi"):
+                self.pi = np.array(data["pi"])
             self.states = data["states"]
-            self.pi = np.array(data["pi"])
             self.obs_encode = data["observations"]
+            self.obs_set = sorted(self.obs_encode, key=self.obs_encode.get)
 
     def _encode(self, obs_seq) -> list:
         return [self.obs_encode[i] for i in obs_seq]
@@ -102,10 +105,41 @@ class Hmm:
             path.append(psi[state, bt])
             state = psi[state, bt]
 
-        path.reverse()
-        return path
+        return "".join([self.states[i] for i in reversed(path)])
 
-    def train(self, seq, A0="uniform", B0="uniform", max_iter=25):
+    def params_estimate(self, Z, seq) -> Tuple[List[float], List[float]]:
+        """Estimate A and B given hidden path Z and observed sequence.
+        Instead of pseudo-count, the non-observed ones will be imputed as uniform"""
+        def overlap_substr_count(s, t):
+            n = 0
+            for i in range(0, len(s) - len(t) + 1):
+                if s[i:i + len(t)] == t:
+                    n += 1
+            return n
+
+        def B_ik(i, k):
+            n = 0
+            for idx, s in enumerate(Z):
+                if s == i and seq[idx] == k:
+                    n += 1
+            return n / Z.count(i)
+        A = []
+        B = []
+        for si in self.states:
+            if Z[:-2].count(si) == 0:
+                A.append([1 / len(self.states)] * len(self.states))
+            else:
+                A.append([overlap_substr_count(Z, si + sj) / Z[:-1].count(si)
+                          for sj in self.states])
+        for si in self.states:
+            if Z.count(si) == 0:
+                B.append([1 / len(self.obs_set)] * len(self.obs_set))
+            else:
+                B.append([B_ik(si, k) for k in self.obs_set])
+
+        return A, B
+
+    def train(self, seq, A0="uniform", B0="uniform", max_iter=25, method="bw"):
         """Baum Welch learning, learn the most likely transition A and emission B"""
         def argwhere(li, target):
             return [idx for idx, i in enumerate(li) if i == target]
@@ -124,29 +158,32 @@ class Hmm:
         assert self.A.shape == (S, S)
         assert self.B.shape == (S, K)
 
-        xsi = np.zeros((N - 1, S, S))
-        for i in range(max_iter):
-            # E-step
-            alpha = self.forward(seq)
-            beta = self.backward(seq)
-            denominator = self.seq_prob(seq)
-            gamma = alpha * beta / denominator
-            for t in range(N - 1):
-                for i in range(S):
-                    for j in range(S):
-                        xsi[t, i, j] = (alpha[i, t] * self.A[i, j]
-                                        * self.B[j, obs[t + 1]] * beta[j, t + 1])
-            xsi = xsi / denominator
-            # M-step
-            A = xsi.sum(axis=0) / xsi.sum(axis=2).sum(axis=0).reshape(-1, 1)
-            B = np.ones_like(self.B)
-            for j in range(K):
-                B[:, j] = gamma[:, argwhere(obs, j)].sum(axis=1) / gamma.sum(axis=1)
-            self.A = A
-            self.B = B
-
-    def estimate_AB(self, path, obs):
-        pass
+        assert method in ("bw", "viterbi")
+        if method == "bw":
+            xsi = np.zeros((N - 1, S, S))
+            for i in range(max_iter):
+                # E-step
+                alpha = self.forward(seq)
+                beta = self.backward(seq)
+                denominator = self.seq_prob(seq)
+                gamma = alpha * beta / denominator
+                for t in range(N - 1):
+                    for i in range(S):
+                        for j in range(S):
+                            xsi[t, i, j] = (alpha[i, t] * self.A[i, j]
+                                            * self.B[j, obs[t + 1]] * beta[j, t + 1])
+                xsi = xsi / denominator
+                # M-step
+                A = xsi.sum(axis=0) / xsi.sum(axis=2).sum(axis=0).reshape(-1, 1)
+                B = np.ones_like(self.B)
+                for j in range(K):
+                    B[:, j] = gamma[:, argwhere(obs, j)].sum(axis=1) / gamma.sum(axis=1)
+                self.A = A
+                self.B = B
+        else:
+            for i in range(max_iter):
+                path = self.viterbi(seq)
+                self.A, self.B = map(np.array, self.params_estimate(path, seq))
 
 
 def main(model_file, obs_seq):
@@ -165,46 +202,52 @@ def main(model_file, obs_seq):
 
     print('Viterbi best path is ')
     for j in viterbi_path:
-        print(hmm.states[j], end=' ')
+        print(j, end=' ')
 
 
-def test_baum_welch(model_file, obs_seq, A0, B0, max_iter):
-    """Correctness verified by submitting to Rosalind, problem BA10K"""
-    hmm = Hmm(model_file)
-    hmm.train(obs_seq, A0=A0, B0=B0, max_iter=max_iter)
-    _A = hmm.A.astype(str).tolist()
-    _B = hmm.B.astype(str).tolist()
-    with open("baum_welch_out.txt", "w") as fo:
-        fo.write("\t".join(hmm.states) + "\n")
-        for idx, s in enumerate(hmm.states):
-            fo.write(s + "\t" + "\t".join(_A[idx]) + "\n")
-        fo.write("-" * 8 + "\n")
-        fo.write("\t".join(sorted(hmm.obs_encode, key=hmm.obs_encode.get)) + "\n")
-        for idx, s in enumerate(hmm.states):
-            fo.write(s + "\t" + "\t".join(_B[idx]) + "\n")
-
-
-def test_estimate_AB():
-    """Correctness verified by submitting to Rosalind, problem BA10K"""
-    pseudo_Z, states, obs_seq, obs_set = make_parameter_estimate_data("params_estimate.txt")
-    A_est, B_est = params_estimate(pseudo_Z, states, obs_seq, obs_set)
-    with open("param_est.txt", "w") as fo:
+def test_output(outout_file, A, B, states, obs_set):
+    with open(outout_file, "w") as fo:
         fo.write("\t".join(states) + "\n")
         for idx, s in enumerate(states):
-            fo.write(s + "\t" + "\t".join([str(i) for i in A_est[idx]]) + "\n")
+            fo.write(s + "\t" + "\t".join(A[idx]) + "\n")
         fo.write("-" * 8 + "\n")
-        fo.write("\t" + "\t".join(obs_set) + "\n")
+        fo.write("\t".join(obs_set) + "\n")
         for idx, s in enumerate(states):
-            fo.write(s + "\t" + "\t".join([str(i) for i in B_est[idx]]) + "\n")
+            fo.write(s + "\t" + "\t".join(B[idx]) + "\n")
+
+
+def test_learning(model_file, obs_seq, A0, B0, max_iter, method):
+    hmm = Hmm(model_file)
+    hmm.train(obs_seq, A0=A0, B0=B0, max_iter=max_iter, method=method)
+    test_output(f"{method}_out.txt", to_list(hmm.A, str), to_list(hmm.B, str),
+                hmm.states, hmm.obs_set)
+
+
+def test_estimate_AB(model_file, Z, obs_seq):
+    """Correctness verified by submitting to Rosalind, problem BA10H"""
+    hmm = Hmm(model_file)
+    A_est, B_est = hmm.params_estimate(Z, obs_seq)
+    test_output("param_est_out.txt", to_list(A_est, str), to_list(B_est, str),
+                hmm.states, hmm.obs_set)
 
 
 if __name__ == "__main__":
+    # Correctness verified by submitting to Rosalind, problem BA10H.
+    Z, obs_seq = make_parameter_estimate_data("params_estimate.txt")
+    test_estimate_AB("train_hmm.json", Z, obs_seq)
+
+    # Correctness verified by submitting to Rosalind, problem BA10K.
+    A0, B0, obs_seq, max_iter = make_learning_data("baum_welch_input.txt", "bw")
+    test_learning("train_hmm.json", obs_seq, A0, B0, max_iter, "bw")
+
+    # Correctness verified by submitting to Rosalind, problem BA10I.
+    A0, B0, obs_seq, max_iter = make_learning_data("viterbi_learning_input.txt", "viterbi")
+    test_learning("train_hmm.json", obs_seq, A0, B0, max_iter, "viterbi")
+
+    print("testing completed." "\n")
+    print("Example: " "\n" "python hmm.py hmm_model.json AGCGTA" "\n")
     parser = argparse.ArgumentParser()
     parser.add_argument("model_file", help="json file specifiying HMM parameters")
     parser.add_argument("obs_seq", help="the full observation sequence")
     args = parser.parse_args()
     main(args.model_file, args.obs_seq)
-
-    A0, B0, obs_seq, max_iter = make_model_json("Baum_Welch.txt", known_params=False)
-    test_baum_welch("train_hmm.json", obs_seq, A0, B0, max_iter)
-    test_estimate_AB()
